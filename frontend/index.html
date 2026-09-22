@@ -304,24 +304,91 @@
       <div class="section-header">
         <span class="section-tag"><i class="fas fa-camera"></i> Live Workshop Portfolio</span>
         <h2 class="section-title">Actual Client Installations &amp; Work</h2>
-        <p class="section-subtitle">Browse through our recently completed custom fabrications. Click any photo for technical specifications and 1-click WhatsApp quotes.</p>
+        <p class="section-subtitle">Browse custom fabrications with live workshop prices. Filter by <strong>Cost / Budget</strong>, <strong>Type of Work</strong>, or <strong>Design Style</strong>.</p>
       </div>
 
-      <!-- Gallery Controls: Search & Category Pills -->
-      <div class="gallery-controls">
-        <div class="gallery-search-wrap">
-          <i class="fas fa-search gallery-search-icon"></i>
-          <input type="text" id="gallerySearch" class="gallery-search-input" placeholder="Search by name, mesh, blinds, WPC, balcony...">
+      <!-- Advanced Multi-Filter Control Studio -->
+      <div class="gallery-filter-studio">
+        <div class="filter-controls-row">
+          <!-- 1. Search Box -->
+          <div class="filter-control-item search-item">
+            <label class="filter-label"><i class="fas fa-search"></i> Search Keywords</label>
+            <div class="gallery-search-wrap">
+              <i class="fas fa-search gallery-search-icon"></i>
+              <input type="text" id="gallerySearch" class="gallery-search-input" placeholder="Search by name, mesh, blinds, WPC, balcony...">
+            </div>
+          </div>
+
+          <!-- 2. Type of Work Filter -->
+          <div class="filter-control-item">
+            <label class="filter-label" for="filterWorkType"><i class="fas fa-hammer"></i> Type of Work</label>
+            <select id="filterWorkType" class="gallery-select">
+              <option value="all">🔨 All Types of Work</option>
+              <option value="mesh_doors">Mosquito Mesh Doors</option>
+              <option value="bathroom_doors">Waterproof Bathroom Doors</option>
+              <option value="cloth_hangers">Ceiling Cloth Hangers</option>
+              <option value="blinds">Window Blinds &amp; Shades</option>
+              <option value="designer_doors">Safety &amp; Designer Doors</option>
+              <option value="window_accessories">Window Accessories &amp; Tracks</option>
+            </select>
+          </div>
+
+          <!-- 3. Cost / Price Filter -->
+          <div class="filter-control-item">
+            <label class="filter-label" for="filterCost"><i class="fas fa-tag"></i> Cost / Budget</label>
+            <select id="filterCost" class="gallery-select">
+              <option value="all">💰 All Price Ranges</option>
+              <option value="under_5k">Under ₹5,000 (Budget Essentials)</option>
+              <option value="5k_15k">₹5,000 - ₹15,000 (Popular Standard)</option>
+              <option value="15k_plus">₹15,000+ (Premium Heavy Doors)</option>
+              <option value="sqft">Per Sq. Ft. Rates (Blinds &amp; Mesh)</option>
+            </select>
+          </div>
+
+          <!-- 4. Design & Style Filter -->
+          <div class="filter-control-item">
+            <label class="filter-label" for="filterDesign"><i class="fas fa-paint-brush"></i> Designs &amp; Styles</label>
+            <select id="filterDesign" class="gallery-select">
+              <option value="all">✨ All Designs &amp; Styles</option>
+              <option value="sliding">↔️ Sliding &amp; Pleated Accordion</option>
+              <option value="hinged">🚪 Hinged Frame &amp; Heavy-Duty</option>
+              <option value="wpc">🌲 WPC Solid Core &amp; Woodgrain</option>
+              <option value="upvc">🛡️ Virgin UPVC Moisture-Proof</option>
+              <option value="pulley">⛓️ 6-Pipe Pulley &amp; Retractable</option>
+              <option value="zebra">🌓 Dual-Tone Zebra &amp; Blackout</option>
+              <option value="safety">🔐 Teak &amp; Steel Security Frame</option>
+            </select>
+          </div>
+
+          <!-- 5. Sort By -->
+          <div class="filter-control-item">
+            <label class="filter-label" for="sortProjects"><i class="fas fa-sort-amount-down"></i> Sort By</label>
+            <select id="sortProjects" class="gallery-select">
+              <option value="featured">⭐ Featured First</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="newest">Recently Added</option>
+            </select>
+          </div>
         </div>
 
+        <!-- Quick Category Filter Pills -->
         <div class="category-pills" id="categoryPills">
           <!-- Populated by JavaScript -->
+        </div>
+
+        <!-- Active Filter Indicator Bar -->
+        <div class="filter-status-bar">
+          <span id="filterCount" class="filter-count-badge">Loading projects...</span>
+          <button id="resetFiltersBtn" class="btn-reset-filters" title="Reset all applied filters">
+            <i class="fas fa-undo"></i> Reset Filters
+          </button>
         </div>
       </div>
 
       <!-- Portfolio Items Grid -->
       <div class="portfolio-grid" id="portfolioGrid">
-        <!-- Loaded dynamically from Backend SQLite -->
+        <!-- Loaded dynamically from Backend / LocalStorage -->
       </div>
     </div>
   </section>

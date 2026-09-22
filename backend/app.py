@@ -2,10 +2,10 @@ import os
 import sys
 import shutil
 import uuid
+import re
 from pathlib import Path
 from typing import Optional, List
 
-# Ensure backend directory is in sys.path
 CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from database import get_db_connection, init_db
-from models import InquiryCreate, InquiryStatusUpdate, AdminLogin, SettingsUpdate
+from models import InquiryCreate, InquiryStatusUpdate, AdminLogin, SettingsUpdate, ProjectPriceUpdate
 from seed_data import seed
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,11 +27,10 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(
     title="Sri Naga Vaishnavi Interiors API",
-    description="Backend API for workshop portfolio, photo uploads, and customer inquiries",
-    version="1.0.0"
+    description="Backend API for workshop portfolio, photo uploads, price management, and customer inquiries",
+    version="1.1.0"
 )
 
-# Enable CORS for seamless local and network access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,13 +39,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Startup event: Initialize database and seed if empty
 @app.on_event("startup")
 def on_startup():
     init_db()
     seed()
 
-# Helper: verify admin PIN
 def verify_admin(x_admin_pin: Optional[str] = Header(None)):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -59,13 +56,23 @@ def verify_admin(x_admin_pin: Optional[str] = Header(None)):
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin PIN")
     return True
 
-# ----------------- PUBLIC PROJECT ENDPOINTS -----------------
+def parse_min_price(price_str: Optional[str]) -> float:
+    if not price_str:
+        return 0.0
+    cleaned = re.sub(r'[^0-9.]', ' ', str(price_str))
+    nums = [float(n) for n in cleaned.split() if n.replace('.', '', 1).isdigit()]
+    return nums[0] if nums else 0.0
+
+# ----------------- PUBLIC PROJECT ENDPOINTS WITH RICH FILTERS -----------------
 
 @app.get("/api/projects")
 def get_projects(
     category: Optional[str] = None,
+    cost_range: Optional[str] = None,
+    design: Optional[str] = None,
     featured: Optional[int] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None
 ):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -86,12 +93,42 @@ def get_projects(
         term = f"%{search}%"
         params.extend([term, term, term])
 
-    query += " ORDER BY featured DESC, id DESC"
+    if design and design != "all":
+        query += " AND (title LIKE ? OR description LIKE ? OR specifications LIKE ?)"
+        term = f"%{design}%"
+        params.extend([term, term, term])
+
     cursor.execute(query, params)
-    rows = cursor.fetchall()
+    rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
-    return [dict(row) for row in rows]
+    if cost_range and cost_range != "all":
+        filtered = []
+        for p in rows:
+            price_str = (p.get("price_range") or "").lower()
+            p_val = parse_min_price(price_str)
+            is_sqft = "sq" in price_str or "sq. ft" in price_str or "sqft" in price_str
+
+            if cost_range == "sqft" and is_sqft:
+                filtered.append(p)
+            elif cost_range == "under_5k" and not is_sqft and p_val > 0 and p_val < 5000:
+                filtered.append(p)
+            elif cost_range == "5k_15k" and not is_sqft and p_val >= 5000 and p_val <= 15000:
+                filtered.append(p)
+            elif cost_range == "15k_plus" and not is_sqft and p_val > 15000:
+                filtered.append(p)
+        rows = filtered
+
+    if sort_by == "price_asc":
+        rows.sort(key=lambda x: parse_min_price(x.get("price_range")))
+    elif sort_by == "price_desc":
+        rows.sort(key=lambda x: parse_min_price(x.get("price_range")), reverse=True)
+    elif sort_by == "newest":
+        rows.sort(key=lambda x: x.get("id", 0), reverse=True)
+    else:
+        rows.sort(key=lambda x: (x.get("featured", 0), x.get("id", 0)), reverse=True)
+
+    return rows
 
 @app.get("/api/projects/{project_id}")
 def get_project(project_id: int):
@@ -103,6 +140,36 @@ def get_project(project_id: int):
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
     return dict(row)
+
+# ----------------- OWNER PRICE CHANGING & PROJECT MANAGEMENT -----------------
+
+@app.patch("/api/projects/{project_id}/price")
+def update_project_price(
+    project_id: int,
+    payload: ProjectPriceUpdate,
+    x_admin_pin: Optional[str] = Header(None)
+):
+    verify_admin(x_admin_pin)
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title FROM projects WHERE id = ?", (project_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    new_price = payload.price_range.strip()
+    cursor.execute("UPDATE projects SET price_range = ? WHERE id = ?", (new_price, project_id))
+    conn.commit()
+    conn.close()
+
+    return {
+        "message": "Price updated successfully",
+        "project_id": project_id,
+        "title": row["title"],
+        "price_range": new_price
+    }
 
 @app.get("/api/categories")
 def get_categories():
@@ -130,8 +197,6 @@ def get_categories():
 
     return categories_meta
 
-# ----------------- OWNER PHOTO UPLOAD & MANAGEMENT -----------------
-
 @app.post("/api/projects")
 async def create_project(
     title: str = Form(...),
@@ -145,7 +210,7 @@ async def create_project(
 ):
     verify_admin(x_admin_pin)
 
-    image_url = "/assets/images/mesh_door.jpg"  # default fallback
+    image_url = "assets/images/mesh_door.jpg"
 
     if file and file.filename:
         ext = Path(file.filename).suffix.lower()
@@ -281,7 +346,6 @@ def get_settings():
     settings = {row["key"]: row["value"] for row in cursor.fetchall()}
     conn.close()
 
-    # Exclude admin PIN from public settings
     settings.pop("admin_pin", None)
     return settings
 

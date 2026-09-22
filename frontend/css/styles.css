@@ -1837,3 +1837,266 @@ h1, h2, h3, h4, h5, h6 {
     padding: 1.75rem;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* ADVANCED GALLERY FILTER STUDIO & LIVE PRICE EDITING STYLES                 */
+/* -------------------------------------------------------------------------- */
+
+.gallery-filter-studio {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.filter-controls-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.filter-control-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.filter-control-item.search-item {
+  grid-column: span 1;
+}
+
+@media (min-width: 992px) {
+  .filter-controls-row {
+    grid-template-columns: 1.4fr 1fr 1fr 1fr 0.9fr;
+  }
+}
+
+.filter-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.filter-label i {
+  color: #2563eb;
+}
+
+.gallery-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #0f172a;
+  background-color: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gallery-select:hover {
+  border-color: #94a3b8;
+}
+
+.gallery-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.filter-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filter-count-badge {
+  font-size: 0.88rem;
+  color: #475569;
+}
+
+.filter-count-badge strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.btn-reset-filters {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-filters:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Portfolio Card Meta Tags */
+.portfolio-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.meta-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.meta-tag i {
+  color: #2563eb;
+}
+
+.meta-tag-design {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.meta-tag-design i {
+  color: #6366f1;
+}
+
+.portfolio-price-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* Owner Portal Live Price Editing Styles */
+.admin-price-cell {
+  min-width: 180px;
+}
+
+.price-display-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.price-badge-live {
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.btn-change-price {
+  background: #f8fafc;
+  color: #2563eb;
+  border: 1px solid #cbd5e1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s;
+}
+
+.btn-change-price:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.price-editor-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.price-edit-input {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1.5px solid #2563eb;
+  border-radius: 6px;
+  outline: none;
+  font-family: inherit;
+  font-weight: 600;
+  width: 140px;
+}
+
+.price-editor-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-save-price {
+  background: #059669;
+  color: #ffffff;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-save-price:hover {
+  background: #047857;
+}
+
+.btn-cancel-price {
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.btn-cancel-price:hover {
+  background: #cbd5e1;
+}

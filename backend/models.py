@@ -10,6 +10,9 @@ class ProjectCreate(BaseModel):
     featured: Optional[int] = 0
     price_range: Optional[str] = ""
 
+class ProjectPriceUpdate(BaseModel):
+    price_range: str
+
 class ProjectResponse(BaseModel):
     id: int
     title: str

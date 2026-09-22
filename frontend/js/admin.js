@@ -1,5 +1,5 @@
 /**
- * Sri Naga Vaishnavi Interiors - Owner Admin Studio
+ * Sri Naga Vaishnavi Interiors - Owner Admin Studio with Instant Price Changing
  */
 
 let adminPin = sessionStorage.getItem('snvi_admin_pin') || '';
@@ -14,8 +14,6 @@ function initAdminModal() {
   const modal = document.getElementById('adminModal');
   const triggerLinks = document.querySelectorAll('.js-open-admin');
   const closeBtn = document.getElementById('closeAdminBtn');
-  const loginView = document.getElementById('adminLoginView');
-  const dashView = document.getElementById('adminDashboardView');
 
   triggerLinks.forEach(link => {
     link.addEventListener('click', (e) => {
@@ -38,12 +36,12 @@ function initAdminModal() {
       const errorMsg = document.getElementById('adminLoginError');
 
       try {
-        const res = await API.verifyAdminPin(pin);
+        await API.verifyAdminPin(pin);
         adminPin = pin;
         sessionStorage.setItem('snvi_admin_pin', pin);
         errorMsg.style.display = 'none';
         showAdminDashboard();
-        showToast('Welcome, Workshop Owner!', 'fa-user-shield');
+        showToast('Welcome, Workshop Owner! Admin Studio active.', 'fa-user-shield');
       } catch (err) {
         errorMsg.textContent = err.message || 'Incorrect PIN. Try again.';
         errorMsg.style.display = 'block';
@@ -87,7 +85,6 @@ function openAdminModal() {
   document.body.style.overflow = 'hidden';
 
   if (adminPin) {
-    // Already authenticated in session
     showAdminDashboard();
   } else {
     showAdminLogin();
@@ -152,7 +149,6 @@ async function showAdminDashboard() {
     });
   }
 
-  // Load default tab
   loadAdminWorks();
 }
 
@@ -166,7 +162,6 @@ function initUploadForm() {
 
   if (!form || !fileInput) return;
 
-  // Drag and drop events
   ['dragenter', 'dragover'].forEach(eventName => {
     dropzone.addEventListener(eventName, (e) => {
       e.preventDefault();
@@ -236,11 +231,9 @@ function initUploadForm() {
       form.reset();
       previewBox.style.display = 'none';
 
-      // Refresh public website gallery
       if (window.loadProjects) window.loadProjects();
       if (window.loadCategories) window.loadCategories();
 
-      // Switch to manage tab
       document.querySelector('[data-tab="tabManageWorks"]').click();
     } catch (err) {
       showToast(err.message || 'Upload failed', 'fa-exclamation-triangle');
@@ -251,7 +244,7 @@ function initUploadForm() {
   });
 }
 
-// Load Works in Admin Management Table
+// Load Works in Admin Management Table with Live Price Editing
 async function loadAdminWorks() {
   const container = document.getElementById('adminWorksList');
   if (!container) return;
@@ -271,10 +264,30 @@ async function loadAdminWorks() {
         </td>
         <td>
           <strong>${escapeHtml(p.title)}</strong>
-          <div style="font-size:0.75rem; color:var(--text-muted);">${escapeHtml(p.specifications || '')}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">${escapeHtml(p.specifications || '')}</div>
         </td>
-        <td><span class="portfolio-category-badge" style="position:static;">${formatCategoryName(p.category)}</span></td>
-        <td>${escapeHtml(p.price_range || '-')}</td>
+        <td>
+          <span class="portfolio-category-badge" style="position:static; display:inline-block;">${formatCategoryName(p.category)}</span>
+        </td>
+        <td class="admin-price-cell">
+          <div id="priceDisplay_${p.id}" class="price-display-wrap">
+            <span class="price-badge-live" id="priceBadge_${p.id}">${escapeHtml(p.price_range || 'Custom Quote')}</span>
+            <button class="btn-change-price" onclick="togglePriceEditor(${p.id})" title="Change Product Price">
+              <i class="fas fa-pencil-alt"></i> Edit Price
+            </button>
+          </div>
+          <div id="priceEditor_${p.id}" class="price-editor-wrap" style="display:none;">
+            <input type="text" id="priceInput_${p.id}" class="price-edit-input" value="${escapeHtml(p.price_range || '')}" placeholder="e.g. ₹4,500 - ₹6,000">
+            <div class="price-editor-actions">
+              <button class="btn-save-price" onclick="saveProjectPrice(${p.id})" title="Save Price">
+                <i class="fas fa-check"></i>
+              </button>
+              <button class="btn-cancel-price" onclick="togglePriceEditor(${p.id})" title="Cancel">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+        </td>
         <td>
           <button class="admin-action-btn btn-delete" onclick="handleDeleteProject(${p.id})">
             <i class="fas fa-trash-alt"></i> Delete
@@ -286,6 +299,54 @@ async function loadAdminWorks() {
     container.innerHTML = `<tr><td colspan="5" style="text-align:center;color:red;">Error: ${err.message}</td></tr>`;
   }
 }
+
+// Toggle Price Editor Inline Box
+window.togglePriceEditor = function(id) {
+  const displayWrap = document.getElementById(`priceDisplay_${id}`);
+  const editorWrap = document.getElementById(`priceEditor_${id}`);
+  const input = document.getElementById(`priceInput_${id}`);
+
+  if (editorWrap.style.display === 'none') {
+    displayWrap.style.display = 'none';
+    editorWrap.style.display = 'flex';
+    input.focus();
+    input.select();
+  } else {
+    displayWrap.style.display = 'flex';
+    editorWrap.style.display = 'none';
+  }
+};
+
+// Save Changed Price to Backend & LocalStorage
+window.saveProjectPrice = async function(id) {
+  const input = document.getElementById(`priceInput_${id}`);
+  const newPrice = input.value.trim();
+
+  if (!newPrice) {
+    showToast('Please enter a valid price / rate.', 'fa-exclamation-circle');
+    return;
+  }
+
+  const saveBtn = document.querySelector(`#priceEditor_${id} .btn-save-price`);
+  const origHtml = saveBtn.innerHTML;
+  saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  saveBtn.disabled = true;
+
+  try {
+    const res = await API.updateProjectPrice(id, newPrice, adminPin);
+    showToast(`Price updated to "${newPrice}" successfully!`, 'fa-check-circle');
+
+    document.getElementById(`priceBadge_${id}`).textContent = newPrice;
+    togglePriceEditor(id);
+
+    if (window.loadProjects) await window.loadProjects();
+  } catch (err) {
+    showToast(err.message || 'Failed to update price', 'fa-exclamation-triangle');
+  } finally {
+    saveBtn.innerHTML = origHtml;
+    saveBtn.disabled = false;
+  }
+};
 
 window.handleDeleteProject = async function(id) {
   if (!confirm('Are you sure you want to delete this work photo from your public portfolio?')) return;
@@ -301,54 +362,44 @@ window.handleDeleteProject = async function(id) {
   }
 };
 
-// Load Inquiries / Customer Leads in Admin Table
+// Load Inquiries
 async function loadAdminInquiries() {
   const container = document.getElementById('adminInquiriesList');
   if (!container) return;
-  container.innerHTML = '<tr><td colspan="6" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading inquiries...</td></tr>';
+  container.innerHTML = '<tr><td colspan="6" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Loading customer inquiries...</td></tr>';
 
   try {
-    const inquiries = await API.getInquiries(adminPin);
-    if (inquiries.length === 0) {
-      container.innerHTML = '<tr><td colspan="6" style="text-align:center;">No customer inquiries received yet.</td></tr>';
+    const inqs = await API.getInquiries(adminPin);
+    if (inqs.length === 0) {
+      container.innerHTML = '<tr><td colspan="6" style="text-align:center;">No inquiries received yet.</td></tr>';
       return;
     }
 
-    container.innerHTML = inquiries.map(inq => {
-      const cleanPhone = (inq.phone || '').replace(/[^0-9]/g, '');
-      const waReplyText = encodeURIComponent(`Hello ${inq.name}, thank you for contacting Sri Naga Vaishnavi Interiors regarding ${inq.service || 'our works'}. I am the workshop owner. How can I assist you?`);
-
+    container.innerHTML = inqs.map(i => {
+      const cleanPhone = (i.phone || '').replace(/[^0-9]/g, '');
+      const waLink = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent('Hello ' + i.name + ', Sri Naga Vaishnavi Interiors workshop is following up on your inquiry.')}`;
       return `
         <tr>
+          <td><span class="inquiry-status-badge status-${(i.status || 'new').toLowerCase()}">${escapeHtml(i.status || 'New')}</span></td>
+          <td><strong>${escapeHtml(i.name)}</strong><br><small style="color:var(--text-muted);">${escapeHtml(i.address || '-')}</small></td>
           <td>
-            <strong>${escapeHtml(inq.name)}</strong>
-            <div style="font-size:0.78rem; color:var(--text-muted);">${inq.created_at || ''}</div>
+            <a href="tel:${escapeHtml(i.phone)}" style="color:var(--primary); font-weight:600;"><i class="fas fa-phone-alt"></i> ${escapeHtml(i.phone)}</a>
+            <br>
+            <a href="${waLink}" target="_blank" style="color:#25D366; font-size:0.8rem;"><i class="fab fa-whatsapp"></i> Chat on WhatsApp</a>
           </td>
+          <td><span class="service-pill">${escapeHtml(i.service || 'General')}</span></td>
+          <td>${escapeHtml(i.message || '-')}</td>
           <td>
-            <a href="tel:${cleanPhone}" style="color:var(--accent-gold); font-weight:600;"><i class="fas fa-phone-alt"></i> ${escapeHtml(inq.phone)}</a>
-          </td>
-          <td><strong>${escapeHtml(inq.service || '-')}</strong></td>
-          <td>
-            <div style="max-width:240px; font-size:0.85rem;">${escapeHtml(inq.message || '-')}</div>
-            ${inq.address ? `<div style="font-size:0.75rem; color:var(--text-muted);"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(inq.address)}</div>` : ''}
-          </td>
-          <td>
-            <select class="form-select" style="padding:0.3rem 0.6rem; font-size:0.8rem;" onchange="handleStatusChange(${inq.id}, this.value)">
-              <option value="New" ${inq.status === 'New' ? 'selected' : ''}>New</option>
-              <option value="Contacted" ${inq.status === 'Contacted' ? 'selected' : ''}>Contacted</option>
-              <option value="Quoted" ${inq.status === 'Quoted' ? 'selected' : ''}>Quoted</option>
-              <option value="Completed" ${inq.status === 'Completed' ? 'selected' : ''}>Completed</option>
+            <select class="admin-status-select" onchange="handleInquiryStatus(${i.id}, this.value)">
+              <option value="New" ${i.status === 'New' ? 'selected' : ''}>New</option>
+              <option value="Contacted" ${i.status === 'Contacted' ? 'selected' : ''}>Contacted</option>
+              <option value="Measurement Scheduled" ${i.status === 'Measurement Scheduled' ? 'selected' : ''}>Scheduled</option>
+              <option value="Completed" ${i.status === 'Completed' ? 'selected' : ''}>Completed</option>
+              <option value="Closed" ${i.status === 'Closed' ? 'selected' : ''}>Closed</option>
             </select>
-          </td>
-          <td>
-            <div style="display:flex; gap:0.4rem;">
-              <a href="https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}?text=${waReplyText}" target="_blank" class="btn-sm-whatsapp" title="WhatsApp Customer">
-                <i class="fab fa-whatsapp"></i> Chat
-              </a>
-              <button class="admin-action-btn btn-delete" onclick="handleDeleteInquiry(${inq.id})" title="Delete lead">
-                <i class="fas fa-trash-alt"></i>
-              </button>
-            </div>
+            <button class="admin-icon-btn btn-delete-inq" onclick="handleDeleteInquiry(${i.id})" title="Delete lead">
+              <i class="fas fa-trash"></i>
+            </button>
           </td>
         </tr>
       `;
@@ -358,82 +409,82 @@ async function loadAdminInquiries() {
   }
 }
 
-window.handleStatusChange = async function(id, status) {
+window.handleInquiryStatus = async function(id, status) {
   try {
     await API.updateInquiryStatus(id, status, adminPin);
-    showToast(`Inquiry marked as ${status}`, 'fa-check');
+    showToast(`Lead status updated to ${status}`, 'fa-check');
   } catch (err) {
-    showToast(err.message || 'Could not update status', 'fa-exclamation-triangle');
+    showToast(err.message || 'Status update failed', 'fa-exclamation-triangle');
   }
 };
 
 window.handleDeleteInquiry = async function(id) {
-  if (!confirm('Are you sure you want to delete this customer inquiry?')) return;
+  if (!confirm('Are you sure you want to delete this lead record?')) return;
   try {
     await API.deleteInquiry(id, adminPin);
-    showToast('Inquiry removed', 'fa-trash');
+    showToast('Lead deleted', 'fa-trash');
     loadAdminInquiries();
   } catch (err) {
-    showToast(err.message || 'Could not delete inquiry', 'fa-exclamation-triangle');
+    showToast(err.message || 'Delete failed', 'fa-exclamation-triangle');
   }
 };
 
-// Workshop Settings Tab
-async function loadAdminSettingsForm() {
-  try {
-    const s = await API.getSettings();
-    document.getElementById('setBusinessName').value = s.business_name || '';
-    document.getElementById('setOwnerName').value = s.owner_name || '';
-    document.getElementById('setPhonePrimary').value = s.phone_primary || '';
-    document.getElementById('setPhoneSecondary').value = s.phone_secondary || '';
-    document.getElementById('setWhatsapp').value = s.whatsapp_number || '';
-    document.getElementById('setAddress').value = s.address || '';
-    document.getElementById('setWorkingHours').value = s.working_hours || '';
-  } catch (err) {
-    console.error('Error loading settings for admin:', err);
-  }
-}
-
+// Workshop Settings Form
 function initSettingsForm() {
-  const form = document.getElementById('adminSettingsForm');
+  const form = document.getElementById('workshopSettingsForm');
   if (!form) return;
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const submitBtn = form.querySelector('button[type="submit"]');
-    const origText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    const orig = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Settings...';
     submitBtn.disabled = true;
 
     const data = {
-      business_name: document.getElementById('setBusinessName').value.trim(),
-      owner_name: document.getElementById('setOwnerName').value.trim(),
-      phone_primary: document.getElementById('setPhonePrimary').value.trim(),
-      phone_secondary: document.getElementById('setPhoneSecondary').value.trim(),
-      whatsapp_number: document.getElementById('setWhatsapp').value.trim(),
-      address: document.getElementById('setAddress').value.trim(),
-      working_hours: document.getElementById('setWorkingHours').value.trim()
+      business_name: document.getElementById('settingBusinessName').value.trim(),
+      owner_name: document.getElementById('settingOwnerName').value.trim(),
+      phone_primary: document.getElementById('settingPhonePrimary').value.trim(),
+      phone_secondary: document.getElementById('settingPhoneSecondary').value.trim(),
+      whatsapp_number: document.getElementById('settingWhatsapp').value.trim(),
+      email: document.getElementById('settingEmail').value.trim(),
+      address: document.getElementById('settingAddress').value.trim(),
+      working_hours: document.getElementById('settingWorkingHours').value.trim()
     };
 
-    const newPin = document.getElementById('setNewPin').value.trim();
-    if (newPin) {
-      data.admin_pin = newPin;
-    }
+    const newPin = document.getElementById('settingNewPin').value.trim();
+    if (newPin) data.admin_pin = newPin;
 
     try {
       await API.updateSettings(data, adminPin);
       if (newPin) {
         adminPin = newPin;
         sessionStorage.setItem('snvi_admin_pin', newPin);
-        document.getElementById('setNewPin').value = '';
       }
-      showToast('Workshop profile settings updated!', 'fa-check-double');
-      if (window.loadSettings) window.loadSettings();
+      showToast('Workshop settings updated successfully!', 'fa-check-double');
+      if (window.loadSettings) await window.loadSettings();
     } catch (err) {
-      showToast(err.message || 'Error updating settings', 'fa-exclamation-triangle');
+      showToast(err.message || 'Failed to save settings', 'fa-exclamation-triangle');
     } finally {
-      submitBtn.innerHTML = origText;
+      submitBtn.innerHTML = orig;
       submitBtn.disabled = false;
     }
   });
+}
+
+async function loadAdminSettingsForm() {
+  try {
+    const s = await API.getSettings();
+    document.getElementById('settingBusinessName').value = s.business_name || '';
+    document.getElementById('settingOwnerName').value = s.owner_name || '';
+    document.getElementById('settingPhonePrimary').value = s.phone_primary || '';
+    document.getElementById('settingPhoneSecondary').value = s.phone_secondary || '';
+    document.getElementById('settingWhatsapp').value = s.whatsapp_number || '';
+    document.getElementById('settingEmail').value = s.email || '';
+    document.getElementById('settingAddress').value = s.address || '';
+    document.getElementById('settingWorkingHours').value = s.working_hours || '';
+    document.getElementById('settingNewPin').value = '';
+  } catch (err) {
+    console.warn('Could not populate settings form', err);
+  }
 }

@@ -1,9 +1,14 @@
 /**
  * Sri Naga Vaishnavi Interiors - Main Public Application Logic
+ * Supports Multi-Filtering by Cost, Type of Work, Designs & Keywords
  */
 
-let currentCategory = 'all';
 let allProjects = [];
+let currentCategory = 'all';
+let currentCostFilter = 'all';
+let currentDesignFilter = 'all';
+let currentSortOrder = 'featured';
+
 let currentSettings = {
   whatsapp_number: '+918328664428',
   phone_primary: '+91 83286 64428',
@@ -13,6 +18,7 @@ let currentSettings = {
 document.addEventListener('DOMContentLoaded', async () => {
   await loadSettings();
   await loadCategories();
+  initFilterControls();
   await loadProjects();
   initEstimator();
   initInquiryForm();
@@ -99,6 +105,8 @@ async function loadCategories() {
         document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
         btn.classList.add('active');
         currentCategory = c.id;
+        const workTypeSelect = document.getElementById('filterWorkType');
+        if (workTypeSelect) workTypeSelect.value = c.id;
         filterAndRenderProjects();
       });
       pillsContainer.appendChild(btn);
@@ -108,7 +116,88 @@ async function loadCategories() {
   }
 }
 
-// Load Projects from Backend
+// Initialize Multi-Filter Controls
+function initFilterControls() {
+  const searchInput = document.getElementById('gallerySearch');
+  const workTypeSelect = document.getElementById('filterWorkType');
+  const costSelect = document.getElementById('filterCost');
+  const designSelect = document.getElementById('filterDesign');
+  const sortSelect = document.getElementById('sortProjects');
+  const resetBtn = document.getElementById('resetFiltersBtn');
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => filterAndRenderProjects());
+  }
+
+  if (workTypeSelect) {
+    workTypeSelect.addEventListener('change', (e) => {
+      currentCategory = e.target.value;
+      document.querySelectorAll('.category-pill').forEach(p => {
+        if (p.dataset.category === currentCategory) p.classList.add('active');
+        else p.classList.remove('active');
+      });
+      filterAndRenderProjects();
+    });
+  }
+
+  if (costSelect) {
+    costSelect.addEventListener('change', (e) => {
+      currentCostFilter = e.target.value;
+      filterAndRenderProjects();
+    });
+  }
+
+  if (designSelect) {
+    designSelect.addEventListener('change', (e) => {
+      currentDesignFilter = e.target.value;
+      filterAndRenderProjects();
+    });
+  }
+
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      currentSortOrder = e.target.value;
+      filterAndRenderProjects();
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      currentCategory = 'all';
+      currentCostFilter = 'all';
+      currentDesignFilter = 'all';
+      currentSortOrder = 'featured';
+
+      if (searchInput) searchInput.value = '';
+      if (workTypeSelect) workTypeSelect.value = 'all';
+      if (costSelect) costSelect.value = 'all';
+      if (designSelect) designSelect.value = 'all';
+      if (sortSelect) sortSelect.value = 'featured';
+
+      document.querySelectorAll('.category-pill').forEach(p => {
+        if (p.dataset.category === 'all') p.classList.add('active');
+        else p.classList.remove('active');
+      });
+
+      filterAndRenderProjects();
+      showToast('Filters reset to show all workshop products', 'fa-undo');
+    });
+  }
+}
+
+window.setGalleryFilter = function(category) {
+  currentCategory = category;
+  const workTypeSelect = document.getElementById('filterWorkType');
+  if (workTypeSelect) workTypeSelect.value = category;
+
+  document.querySelectorAll('.category-pill').forEach(p => {
+    if (p.dataset.category === category) p.classList.add('active');
+    else p.classList.remove('active');
+  });
+
+  filterAndRenderProjects();
+};
+
 async function loadProjects() {
   const grid = document.getElementById('portfolioGrid');
   if (!grid) return;
@@ -122,32 +211,87 @@ async function loadProjects() {
   }
 }
 
-// Filter and render projects according to active category and search
+function parseMinPriceNum(priceStr) {
+  if (!priceStr) return 0;
+  const cleaned = String(priceStr).replace(/[^0-9.]/g, ' ');
+  const nums = cleaned.split(/\s+/).filter(Boolean).map(Number).filter(n => !isNaN(n));
+  return nums.length > 0 ? nums[0] : 0;
+}
+
 function filterAndRenderProjects() {
   const grid = document.getElementById('portfolioGrid');
   const searchInput = document.getElementById('gallerySearch');
+  const countEl = document.getElementById('filterCount');
   const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
 
-  let filtered = allProjects;
+  let filtered = [...allProjects];
 
+  // 1. Type of Work Filter
   if (currentCategory !== 'all') {
     filtered = filtered.filter(p => p.category === currentCategory);
   }
 
+  // 2. Cost / Price Filter
+  if (currentCostFilter !== 'all') {
+    filtered = filtered.filter(p => {
+      const pStr = (p.price_range || '').toLowerCase();
+      const pVal = parseMinPriceNum(pStr);
+      const isSqft = pStr.includes('sq') || pStr.includes('sq. ft') || pStr.includes('sqft');
+
+      if (currentCostFilter === 'sqft') return isSqft;
+      if (currentCostFilter === 'under_5k') return !isSqft && pVal > 0 && pVal < 5000;
+      if (currentCostFilter === '5k_15k') return !isSqft && pVal >= 5000 && pVal <= 15000;
+      if (currentCostFilter === '15k_plus') return !isSqft && pVal > 15000;
+      return true;
+    });
+  }
+
+  // 3. Design / Style Filter
+  if (currentDesignFilter !== 'all') {
+    const d = currentDesignFilter.toLowerCase();
+    filtered = filtered.filter(p =>
+      (p.design_style || '').toLowerCase().includes(d) ||
+      (p.title || '').toLowerCase().includes(d) ||
+      (p.description || '').toLowerCase().includes(d) ||
+      (p.specifications || '').toLowerCase().includes(d)
+    );
+  }
+
+  // 4. Keyword Search
   if (query) {
     filtered = filtered.filter(p => 
       (p.title || '').toLowerCase().includes(query) ||
       (p.description || '').toLowerCase().includes(query) ||
-      (p.specifications || '').toLowerCase().includes(query)
+      (p.specifications || '').toLowerCase().includes(query) ||
+      (p.work_type || '').toLowerCase().includes(query) ||
+      (p.design_style || '').toLowerCase().includes(query)
     );
+  }
+
+  // 5. Sorting
+  if (currentSortOrder === 'price_asc') {
+    filtered.sort((a, b) => parseMinPriceNum(a.price_range) - parseMinPriceNum(b.price_range));
+  } else if (currentSortOrder === 'price_desc') {
+    filtered.sort((a, b) => parseMinPriceNum(b.price_range) - parseMinPriceNum(a.price_range));
+  } else if (currentSortOrder === 'newest') {
+    filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
+  } else {
+    filtered.sort((a, b) => (b.featured || 0) - (a.featured || 0) || (b.id || 0) - (a.id || 0));
+  }
+
+  if (countEl) {
+    countEl.innerHTML = `Showing <strong>${filtered.length}</strong> of ${allProjects.length} workshop fabrications`;
   }
 
   if (filtered.length === 0) {
     grid.innerHTML = `
-      <div class="no-results">
-        <i class="fas fa-tools"></i>
-        <h3>No workshop projects found</h3>
-        <p>Try selecting another category or clear your search.</p>
+      <div class="no-results" style="grid-column: 1 / -1; padding: 3rem 1rem; text-align: center;">
+        <i class="fas fa-filter" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
+        <h3 style="font-size: 1.3rem; margin-bottom: 0.5rem;">No products match your selected filters</h3>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Try clearing your cost, design, or search criteria to explore all products.</p>
+        <button class="btn btn-primary" onclick="document.getElementById('resetFiltersBtn').click()">
+          <i class="fas fa-undo"></i> Reset All Filters
+        </button>
       </div>
     `;
     return;
@@ -163,11 +307,18 @@ function filterAndRenderProjects() {
         </div>
       </div>
       <div class="portfolio-content">
+        <div class="portfolio-meta-tags">
+          <span class="meta-tag"><i class="fas fa-hammer"></i> ${escapeHtml(p.work_type || formatCategoryName(p.category))}</span>
+          ${p.design_style ? `<span class="meta-tag meta-tag-design"><i class="fas fa-paint-brush"></i> ${escapeHtml(p.design_style)}</span>` : ''}
+        </div>
         <h3 class="portfolio-title">${escapeHtml(p.title)}</h3>
         <p class="portfolio-desc">${escapeHtml(p.description || '')}</p>
         ${p.specifications ? `<div class="portfolio-specs"><i class="fas fa-check-double text-gold"></i> ${escapeHtml(p.specifications)}</div>` : ''}
         <div class="portfolio-footer">
-          <span class="portfolio-price">${escapeHtml(p.price_range || 'Custom Quote')}</span>
+          <div class="portfolio-price-block">
+            <span class="price-label">Workshop Price</span>
+            <span class="portfolio-price">${escapeHtml(p.price_range || 'Custom Quote')}</span>
+          </div>
           <div class="portfolio-actions">
             <a href="${getWhatsAppEnquiryUrl(p.title)}" target="_blank" class="btn-sm-whatsapp" title="Enquire on WhatsApp">
               <i class="fab fa-whatsapp"></i> Enquire
@@ -179,15 +330,6 @@ function filterAndRenderProjects() {
   `).join('');
 }
 
-// Search input listener
-const searchInput = document.getElementById('gallerySearch');
-if (searchInput) {
-  searchInput.addEventListener('input', () => {
-    filterAndRenderProjects();
-  });
-}
-
-// Format category string
 function formatCategoryName(cat) {
   const map = {
     'mesh_doors': 'Mesh Door',
@@ -202,7 +344,7 @@ function formatCategoryName(cat) {
 
 function escapeHtml(text) {
   if (!text) return '';
-  return text
+  return String(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -248,137 +390,100 @@ window.closeLightbox = function() {
   document.body.style.overflow = '';
 };
 
-// Close modal on escape or background click
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeLightbox();
-    if (window.closeAdminModal) window.closeAdminModal();
-  }
-});
-
-// Interactive Instant Quote Estimator
+// Instant Cost Estimator Logic
 function initEstimator() {
   const serviceSelect = document.getElementById('calcService');
-  const variantSelect = document.getElementById('calcVariant');
-  const qtyInput = document.getElementById('calcQty');
+  const typeSelect = document.getElementById('calcType');
   const widthInput = document.getElementById('calcWidth');
   const heightInput = document.getElementById('calcHeight');
-  const dimensionRow = document.getElementById('calcDimensionRow');
+  const qtyInput = document.getElementById('calcQty');
+  const estTotal = document.getElementById('estTotal');
+  const estSqft = document.getElementById('estSqft');
+  const estNote = document.getElementById('estNote');
+  const waEstBtn = document.getElementById('estWhatsAppBtn');
 
   if (!serviceSelect) return;
 
-  const serviceVariants = {
+  const typeOptions = {
     mesh_door: [
-      { id: 'single_mesh', name: 'Single Balcony Mesh Door (Standard 3x7 ft)', basePrice: 4200, unit: 'door' },
-      { id: 'double_mesh', name: 'Double Balcony Mesh Door (5x7 ft)', basePrice: 7200, unit: 'pair' },
-      { id: 'pleated_mesh', name: 'Pleated Accordion Sliding Screen (per sqft)', basePrice: 210, unit: 'sqft' }
+      { id: 'ss304_hinged', name: 'SS304 Mesh Hinged Aluminium Door (₹4,800/door)', basePrice: 4800, isFixed: true },
+      { id: 'pleated_mesh', name: 'Pleated Sliding Accordion Mesh (₹220/sq.ft)', basePrice: 220, isFixed: false },
+      { id: 'magnetic_net', name: 'Magnetic Window Insect Net (₹85/sq.ft)', basePrice: 85, isFixed: false }
     ],
     bathroom_door: [
-      { id: 'wpc_solid', name: '100% Waterproof Solid WPC Designer Door', basePrice: 5800, unit: 'door' },
-      { id: 'wpc_glass', name: 'WPC Door with Frosted Designer Glass Insert', basePrice: 7200, unit: 'door' },
-      { id: 'upvc_standard', name: 'Heavy-Gauge UPVC Multi-Chamber Door', basePrice: 4600, unit: 'door' }
+      { id: 'wpc_frosted', name: 'Designer Waterproof WPC Solid Door (₹6,800/door)', basePrice: 6800, isFixed: true },
+      { id: 'upvc_door', name: 'Heavy Duty UPVC Restroom Door (₹4,800/door)', basePrice: 4800, isFixed: true }
     ],
     cloth_hanger: [
-      { id: 'hanger_5ft', name: '6-Pipe Jindal SS304 Ceiling Hanger (5 Ft)', basePrice: 1950, unit: 'set' },
-      { id: 'hanger_6ft', name: '6-Pipe Jindal SS304 Ceiling Hanger (6 Ft)', basePrice: 2250, unit: 'set' },
-      { id: 'hanger_7ft', name: '6-Pipe Jindal SS304 Ceiling Hanger (7 Ft)', basePrice: 2550, unit: 'set' },
-      { id: 'hanger_8ft', name: '6-Pipe Jindal SS304 Ceiling Hanger (8 Ft)', basePrice: 2950, unit: 'set' },
-      { id: 'hanger_wall', name: 'Stainless Steel Wall-Mounted Folding Rack', basePrice: 1800, unit: 'set' }
+      { id: 'ceiling_pulley', name: 'Balcony 6-Pipe SS304 Ceiling Pulley Hanger (₹2,600 installed)', basePrice: 2600, isFixed: true },
+      { id: 'wall_accordion', name: 'Wall Mounted Folding SS Dryer Rack (₹1,900/piece)', basePrice: 1900, isFixed: true }
     ],
     blinds: [
-      { id: 'zebra_blinds', name: 'Dual-Tone Light Filter Zebra Blinds (per sqft)', basePrice: 155, unit: 'sqft' },
-      { id: 'blackout_roller', name: '100% Thermal Blackout Roller Blinds (per sqft)', basePrice: 140, unit: 'sqft' },
-      { id: 'wooden_venetian', name: 'Luxury Wooden Venetian Blinds (per sqft)', basePrice: 230, unit: 'sqft' }
-    ],
-    designer_doors: [
-      { id: 'safety_steel_door', name: 'Heavy Steel Main Safety Door with Teak Finish', basePrice: 16500, unit: 'door' },
-      { id: 'sliding_partition', name: 'Aluminium Profile Sliding Partition Door', basePrice: 12500, unit: 'door' }
+      { id: 'zebra_blinds', name: 'Dual-Tone Daylight Zebra Blinds (₹150/sq.ft)', basePrice: 150, isFixed: false },
+      { id: 'blackout_roller', name: 'Thermal Blackout Roller Blinds (₹135/sq.ft)', basePrice: 135, isFixed: false }
     ]
   };
 
-  function updateVariants() {
-    const selectedService = serviceSelect.value;
-    const variants = serviceVariants[selectedService] || [];
-    variantSelect.innerHTML = variants.map(v => `<option value="${v.id}" data-price="${v.basePrice}" data-unit="${v.unit}">${v.name}</option>`).join('');
-
-    const activeVariant = variants[0];
-    if (activeVariant && activeVariant.unit === 'sqft') {
-      dimensionRow.style.display = 'grid';
-    } else {
-      dimensionRow.style.display = 'none';
-    }
-    recalculate();
+  function updateTypeOptions() {
+    const s = serviceSelect.value;
+    const opts = typeOptions[s] || [];
+    typeSelect.innerHTML = opts.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
+    calculate();
   }
 
-  function recalculate() {
-    const selectedOption = variantSelect.options[variantSelect.selectedIndex];
-    if (!selectedOption) return;
-
-    const basePrice = parseFloat(selectedOption.dataset.price) || 0;
-    const unit = selectedOption.dataset.unit;
+  function calculate() {
+    const s = serviceSelect.value;
+    const tId = typeSelect.value;
+    const w = parseFloat(widthInput.value) || 3;
+    const h = parseFloat(heightInput.value) || 7;
     const qty = parseInt(qtyInput.value) || 1;
 
-    let subtotal = 0;
-    let sizeDetails = '';
+    const opts = typeOptions[s] || [];
+    const chosen = opts.find(o => o.id === tId) || opts[0];
 
-    if (unit === 'sqft') {
-      const w = parseFloat(widthInput.value) || 4;
-      const h = parseFloat(heightInput.value) || 5;
-      const totalSqft = (w * h) * qty;
-      subtotal = totalSqft * basePrice;
-      sizeDetails = `${w}ft × ${h}ft (${w * h} sq.ft × ${qty} unit${qty > 1 ? 's' : ''})`;
+    if (!chosen) return;
+
+    const sqft = (w * h) * qty;
+    let total = 0;
+
+    if (chosen.isFixed) {
+      total = chosen.basePrice * qty;
+      if (estSqft) estSqft.textContent = `${qty} unit(s)`;
     } else {
-      subtotal = basePrice * qty;
-      sizeDetails = `${qty} unit${qty > 1 ? 's' : ''} (Standard dimensions)`;
+      total = chosen.basePrice * sqft;
+      if (estSqft) estSqft.textContent = `${sqft.toFixed(1)} sq. ft total`;
     }
 
-    const installation = (unit === 'sqft' ? 0 : 0); // included in workshop direct price
-    const total = subtotal + installation;
+    if (estTotal) estTotal.textContent = `₹${Math.round(total).toLocaleString('en-IN')}`;
+    if (estNote) estNote.textContent = '*Estimated workshop quotation. Final rate verified after free doorstep measurement.';
 
-    document.getElementById('estProduct').textContent = selectedOption.textContent;
-    document.getElementById('estSpecs').textContent = sizeDetails;
-    document.getElementById('estSubtotal').textContent = `₹${Math.round(subtotal).toLocaleString('en-IN')}`;
-    document.getElementById('estInstallation').textContent = 'FREE / Included';
-    document.getElementById('estTotal').textContent = `₹${Math.round(total).toLocaleString('en-IN')}`;
-
-    // Update WhatsApp link for this estimate
-    const cleanWa = (currentSettings.whatsapp_number || '918328664428').replace(/[^0-9]/g, '');
-    const waText = encodeURIComponent(
-      `Hello Sri Naga Vaishnavi Interiors,\nI used your online calculator for:\n- Item: ${selectedOption.textContent}\n- Details: ${sizeDetails}\n- Estimated Price: ₹${Math.round(total).toLocaleString('en-IN')}\n\nPlease let me know when you can visit for measurement.`
-    );
-    const waBtn = document.getElementById('calcWhatsAppBtn');
-    if (waBtn) waBtn.href = `https://wa.me/${cleanWa}?text=${waText}`;
+    if (waEstBtn) {
+      const cleanWa = (currentSettings.whatsapp_number || '918328664428').replace(/[^0-9]/g, '');
+      const msg = encodeURIComponent(`Hello Sri Naga Vaishnavi Interiors, I calculated an estimate of ₹${Math.round(total).toLocaleString('en-IN')} for ${qty}x ${chosen.name} (${w}ft x ${h}ft). Please confirm and schedule free measurement.`);
+      waEstBtn.href = `https://wa.me/${cleanWa}?text=${msg}`;
+    }
   }
 
-  serviceSelect.addEventListener('change', updateVariants);
-  variantSelect.addEventListener('change', () => {
-    const selectedOption = variantSelect.options[variantSelect.selectedIndex];
-    if (selectedOption && selectedOption.dataset.unit === 'sqft') {
-      dimensionRow.style.display = 'grid';
-    } else {
-      dimensionRow.style.display = 'none';
-    }
-    recalculate();
-  });
+  serviceSelect.addEventListener('change', updateTypeOptions);
+  typeSelect.addEventListener('change', calculate);
+  widthInput.addEventListener('input', calculate);
+  heightInput.addEventListener('input', calculate);
+  qtyInput.addEventListener('input', calculate);
 
-  qtyInput.addEventListener('input', recalculate);
-  widthInput.addEventListener('input', recalculate);
-  heightInput.addEventListener('input', recalculate);
-
-  updateVariants();
+  updateTypeOptions();
 }
 
-// Inquiry Form Submission
+// Inquiry Form Logic
 function initInquiryForm() {
-  const form = document.getElementById('contactForm');
+  const form = document.getElementById('inquiryForm');
   if (!form) return;
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const origBtnText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-    submitBtn.disabled = true;
+    const btn = form.querySelector('button[type="submit"]');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting Request...';
+    btn.disabled = true;
 
     const data = {
       name: document.getElementById('inqName').value.trim(),
@@ -389,47 +494,31 @@ function initInquiryForm() {
     };
 
     try {
-      const res = await API.submitInquiry(data);
-      showToast('Inquiry submitted! We will contact you shortly.', 'fa-check-circle');
-      
-      // WhatsApp direct prompt
-      const cleanWa = (currentSettings.whatsapp_number || '918328664428').replace(/[^0-9]/g, '');
-      const waMsg = encodeURIComponent(
-        `Hi Sri Naga Vaishnavi Interiors, I just submitted an enquiry:\nName: ${data.name}\nPhone: ${data.phone}\nService: ${data.service}\nLocation: ${data.address}\nNote: ${data.message}`
-      );
-      
-      const promptWa = confirm('Inquiry recorded successfully! Would you also like to open WhatsApp to chat directly with the owner right now?');
-      if (promptWa) {
-        window.open(`https://wa.me/${cleanWa}?text=${waMsg}`, '_blank');
-      }
-
+      await API.submitInquiry(data);
+      showToast('Thank you! Owner will call you shortly for free measurement.', 'fa-phone-volume');
       form.reset();
     } catch (err) {
-      showToast(err.message || 'Error sending inquiry', 'fa-exclamation-triangle');
+      showToast('Could not submit. Please call or WhatsApp us directly.', 'fa-exclamation-triangle');
     } finally {
-      submitBtn.innerHTML = origBtnText;
-      submitBtn.disabled = false;
+      btn.innerHTML = orig;
+      btn.disabled = false;
     }
   });
 }
 
-// Mobile Menu Toggle
+// Mobile Hamburger Menu
 function initMobileMenu() {
   const btn = document.getElementById('mobileMenuBtn');
-  const nav = document.getElementById('navLinks');
-  if (!btn || !nav) return;
+  const links = document.getElementById('navLinks');
+  if (!btn || !links) return;
 
   btn.addEventListener('click', () => {
-    nav.style.display = nav.style.display === 'flex' ? 'none' : 'flex';
-    if (nav.style.display === 'flex') {
-      nav.style.flexDirection = 'column';
-      nav.style.position = 'absolute';
-      nav.style.top = '80px';
-      nav.style.left = '0';
-      nav.style.right = '0';
-      nav.style.background = 'rgba(10, 15, 29, 0.98)';
-      nav.style.padding = '1.5rem';
-      nav.style.borderBottom = '1px solid var(--border-glass)';
-    }
+    links.classList.toggle('active');
+  });
+
+  links.querySelectorAll('.nav-link').forEach(l => {
+    l.addEventListener('click', () => {
+      links.classList.remove('active');
+    });
   });
 }
